@@ -48,7 +48,7 @@ func main() {
 		log.Fatalf("Failed to read migration: %v", err)
 	}
 	if err := db.Migrate(string(migrationSQL)); err != nil {
-		log.Fatalf("Failed to run migrations: %v", err)
+		log.Printf("Failed to run migrations: %v", err)
 	}
 
 	// Initialize stores.
