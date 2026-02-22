@@ -1,0 +1,14 @@
+services:
+  bot:
+    image: ghcr.io/o111oo11o/trip-ledger:latest
+    build: .
+    restart: unless-stopped
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - EXCHANGE_RATE_API_KEY=${EXCHANGE_RATE_API_KEY}
+      - DB_PATH=/data/trip-ledger.db
+    volumes:
+      - bot-data:/data
+
+volumes:
+  bot-data:
