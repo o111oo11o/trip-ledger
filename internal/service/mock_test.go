@@ -211,12 +211,20 @@ func (m *mockTransactionStore) GetActiveRepayments(_ context.Context, groupID in
 	return result, nil
 }
 
-func (m *mockTransactionStore) GetSpending(_ context.Context, groupID, memberID int64, from, to time.Time) ([]model.Transaction, error) {
-	var result []model.Transaction
+func (m *mockTransactionStore) GetSpending(_ context.Context, groupID, memberID int64, from, to time.Time) ([]store.SpendingRow, error) {
+	var result []store.SpendingRow
 	for _, tx := range m.transactions {
-		if tx.GroupID == groupID && tx.PayerMemberID == memberID && tx.CancelledAt == nil &&
-			!tx.TransactionDate.Before(from) && !tx.TransactionDate.After(to) {
-			result = append(result, tx)
+		if tx.GroupID != groupID || tx.CancelledAt != nil {
+			continue
+		}
+		if tx.Type == model.TxLend || tx.Type == model.TxRepay {
+			continue
+		}
+		if tx.TransactionDate.Before(from) || tx.TransactionDate.After(to) {
+			continue
+		}
+		if tx.PayerMemberID == memberID {
+			result = append(result, store.SpendingRow{Transaction: tx, UserShareCents: tx.AmountCents})
 		}
 	}
 	return result, nil

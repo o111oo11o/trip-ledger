@@ -37,8 +37,9 @@ type TransactionStore interface {
 	// GetActiveRepayments returns all active repay transactions for a group.
 	GetActiveRepayments(ctx context.Context, groupID int64) ([]RepaymentRecord, error)
 
-	// GetSpending returns transactions for a member in a date range.
-	GetSpending(ctx context.Context, groupID, memberID int64, from, to time.Time) ([]model.Transaction, error)
+	// GetSpending returns spending rows for a member in a date range.
+	// Each row carries UserShareCents — the member's effective cost for that transaction.
+	GetSpending(ctx context.Context, groupID, memberID int64, from, to time.Time) ([]SpendingRow, error)
 
 	// GetTotalDebtBetween returns the net amount that fromMember owes toMember
 	// by summing participant records and repayments.
@@ -57,4 +58,11 @@ type RepaymentRecord struct {
 	PayerMemberID int64
 	ToMemberID    int64
 	AmountCents   int64
+}
+
+// SpendingRow is returned by GetSpending; UserShareCents is the member's
+// effective cost (not necessarily the full transaction amount).
+type SpendingRow struct {
+	model.Transaction
+	UserShareCents int64
 }

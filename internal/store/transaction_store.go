@@ -156,31 +156,73 @@ func (s *SQLiteTransactionStore) GetActiveRepayments(ctx context.Context, groupI
 	})
 }
 
-func (s *SQLiteTransactionStore) GetSpending(ctx context.Context, groupID, memberID int64, from, to time.Time) ([]model.Transaction, error) {
+func (s *SQLiteTransactionStore) GetSpending(ctx context.Context, groupID, memberID int64, from, to time.Time) ([]SpendingRow, error) {
+	fromStr := from.Format("2006-01-02")
+	toStr := to.Format("2006-01-02")
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, group_id, payer_member_id, type, amount_cents,
+		`-- Part A: personal_expense where member is payer
+		 SELECT id, group_id, payer_member_id, type, amount_cents,
 		        original_amount, original_currency, exchange_rate,
-		        description, transaction_date, COALESCE(telegram_message_id, 0), cancelled_at, created_at
+		        description, transaction_date, COALESCE(telegram_message_id, 0),
+		        cancelled_at, created_at,
+		        amount_cents AS user_share_cents
 		 FROM transactions
 		 WHERE group_id = ? AND payer_member_id = ? AND cancelled_at IS NULL
+		   AND type = 'personal_expense'
 		   AND transaction_date >= ? AND transaction_date <= ?
+
+		 UNION ALL
+
+		 -- Part B: split txs where member is payer — net share = total minus what others owe
+		 SELECT t.id, t.group_id, t.payer_member_id, t.type, t.amount_cents,
+		        t.original_amount, t.original_currency, t.exchange_rate,
+		        t.description, t.transaction_date, COALESCE(t.telegram_message_id, 0),
+		        t.cancelled_at, t.created_at,
+		        (t.amount_cents - COALESCE(SUM(tp.amount_cents), 0)) AS user_share_cents
+		 FROM transactions t
+		 LEFT JOIN transaction_participants tp ON tp.transaction_id = t.id
+		 WHERE t.group_id = ? AND t.payer_member_id = ? AND t.cancelled_at IS NULL
+		   AND t.type IN ('split_equal', 'split_except', 'split_partial')
+		   AND t.transaction_date >= ? AND t.transaction_date <= ?
+		 GROUP BY t.id
+
+		 UNION ALL
+
+		 -- Part C: split txs where member is a non-payer participant
+		 SELECT t.id, t.group_id, t.payer_member_id, t.type, t.amount_cents,
+		        t.original_amount, t.original_currency, t.exchange_rate,
+		        t.description, t.transaction_date, COALESCE(t.telegram_message_id, 0),
+		        t.cancelled_at, t.created_at,
+		        COALESCE(SUM(tp.amount_cents), 0) AS user_share_cents
+		 FROM transactions t
+		 JOIN transaction_participants tp ON tp.transaction_id = t.id AND tp.member_id = ?
+		 WHERE t.group_id = ? AND t.payer_member_id != ? AND t.cancelled_at IS NULL
+		   AND t.type IN ('split_equal', 'split_except', 'split_partial')
+		   AND t.transaction_date >= ? AND t.transaction_date <= ?
+		 GROUP BY t.id
+
 		 ORDER BY transaction_date DESC`,
-		groupID, memberID, from.Format("2006-01-02"), to.Format("2006-01-02"),
+		// Part A
+		groupID, memberID, fromStr, toStr,
+		// Part B
+		groupID, memberID, fromStr, toStr,
+		// Part C
+		memberID, groupID, memberID, fromStr, toStr,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("query spending: %w", err)
 	}
-	return scanRows(rows, func(r *sql.Rows) (model.Transaction, error) {
-		var tx model.Transaction
+	return scanRows(rows, func(r *sql.Rows) (SpendingRow, error) {
+		var row SpendingRow
 		if err := r.Scan(
-			&tx.ID, &tx.GroupID, &tx.PayerMemberID, &tx.Type, &tx.AmountCents,
-			&tx.OriginalAmount, &tx.OriginalCurrency, &tx.ExchangeRate,
-			&tx.Description, &tx.TransactionDate, &tx.TelegramMessageID,
-			&tx.CancelledAt, &tx.CreatedAt,
+			&row.ID, &row.GroupID, &row.PayerMemberID, &row.Type, &row.AmountCents,
+			&row.OriginalAmount, &row.OriginalCurrency, &row.ExchangeRate,
+			&row.Description, &row.TransactionDate, &row.TelegramMessageID,
+			&row.CancelledAt, &row.CreatedAt, &row.UserShareCents,
 		); err != nil {
-			return tx, fmt.Errorf("scan transaction: %w", err)
+			return row, fmt.Errorf("scan spending row: %w", err)
 		}
-		return tx, nil
+		return row, nil
 	})
 }
 
