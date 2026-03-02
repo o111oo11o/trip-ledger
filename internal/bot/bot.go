@@ -495,8 +495,12 @@ func (b *Bot) handleSpending(ctx context.Context, msg *tgbotapi.Message, group *
 		if err != nil {
 			displayCents = e.AmountCents
 		}
-		sb.WriteString(fmt.Sprintf("  %s: %s %s — %s\n",
-			e.Date.Format("02-Jan"), service.FormatMoney(displayCents), displayCurr, e.Description))
+		emoji := "🙂"
+		if e.Type == model.TxSplitEqual || e.Type == model.TxSplitExcept || e.Type == model.TxSplitPartial {
+			emoji = "🫂"
+		}
+		sb.WriteString(fmt.Sprintf("  %s %s: %s %s — %s\n",
+			emoji, e.Date.Format("02-Jan"), service.FormatMoney(displayCents), displayCurr, e.Description))
 	}
 	totalDisplay, err := b.service.ConvertFromUSD(summary.TotalCents, displayCurr)
 	if err != nil {

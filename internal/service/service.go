@@ -371,20 +371,20 @@ func (s *LedgerService) GetDebts(ctx context.Context, groupID int64, filterMembe
 // GetSpending returns a spending summary for a member in a date range.
 // memberID is the internal (store) member ID.
 func (s *LedgerService) GetSpending(ctx context.Context, groupID, memberID int64, from, to time.Time) (*model.SpendingSummary, error) {
-	txs, err := s.transactions.GetSpending(ctx, groupID, memberID, from, to)
+	rows, err := s.transactions.GetSpending(ctx, groupID, memberID, from, to)
 	if err != nil {
 		return nil, err
 	}
 
 	summary := &model.SpendingSummary{Member: model.Member{ID: memberID}}
-	for _, tx := range txs {
+	for _, row := range rows {
 		summary.Entries = append(summary.Entries, model.SpendingEntry{
-			Description: tx.Description,
-			AmountCents: tx.AmountCents,
-			Date:        tx.TransactionDate,
-			Type:        tx.Type,
+			Description: row.Description,
+			AmountCents: row.UserShareCents,
+			Date:        row.TransactionDate,
+			Type:        row.Type,
 		})
-		summary.TotalCents += tx.AmountCents
+		summary.TotalCents += row.UserShareCents
 	}
 	return summary, nil
 }

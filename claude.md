@@ -187,6 +187,7 @@ Six tables in SQLite:
 | Date | Author | Change |
 |---|---|---|
 | initial | agent | Created claude.md from project specification |
+| 2026-03-02 | agent | `/spending` now shows each member's net share: payer sees total minus others' participant amounts; non-payer participants see their own share; `lend`/`repay` excluded. Added `SpendingRow` type to store layer. Added 🙂/🫂 emoji markers in output. |
 
 ## Agent Workflow
 
