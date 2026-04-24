@@ -52,3 +52,29 @@ jobs:
  #         script: |
 #            cd ${{ secrets.VPS_DEPLOY_PATH }}
 #            docker compose pull && docker compose up -d
+
+  notify-telegram:
+    name: Notify Telegram on successful deploy
+    needs: build-and-deploy
+    runs-on: ubuntu-latest
+    if: success()
+
+    steps:
+      - name: Send Telegram message
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d text=$'✅ Production deploy successful for ss-config-gateway\nBranch: ${{ github.ref_name }}\nCommit: ${{ github.sha }}\nTriggered by: ${{ github.actor }}\nRun: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+
+  notify-telegram-fail:
+    name: Notify Telegram on successful deploy
+    needs: build-and-deploy
+    runs-on: ubuntu-latest
+    if: failure()
+
+    steps:
+      - name: Send Telegram message
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d text=$'❌ Production deploy unsuccessful for ss-config-gateway\nBranch: ${{ github.ref_name }}\nCommit: ${{ github.sha }}\nTriggered by: ${{ github.actor }}\nRun: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
